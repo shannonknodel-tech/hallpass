@@ -15,7 +15,7 @@ const C = {
   bg: '#f8fafc', white: '#fff', ink: '#0f172a', slate: '#475569',
   muted: '#94a3b8', cloud: '#f1f5f9', border: '#e2e8f0',
   green: '#10b981', greenBg: 'rgba(16,185,129,0.08)', greenBorder: 'rgba(16,185,129,0.2)',
-  red: '#ef4444', redBg: 'rgba(239,68,68,0.06)', redBorder: 'rgba(239,68,68,0.2)',
+  red: '#ef4444', redBg: 'rgba(239,68,68,0.08)', redBorder: 'rgba(239,68,68,0.3)',
   amber: '#f59e0b', primary: '#667eea',
 }
 
