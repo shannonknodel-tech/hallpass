@@ -97,7 +97,10 @@ function SchedulePicker({ day, start, periodName, onChange, roster }: {
           {/* Period */}
           <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>Period</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 14 }}>
-            {SCHEDULES[pickDay][pickStart].map(p => {
+            {SCHEDULES[pickDay][pickStart].filter(p => {
+              const num = p.name.match(/\d+/)?.[0] ?? ''
+              return roster[`${pickDay}_${num}`]?.name?.trim()
+            }).map(p => {
               const pNum = p.name.match(/\d+/)?.[0] ?? ''
               const pDay = pickDay === 'red' ? 'Red' : 'Black'
               const periodLabel = `${pDay} ${pNum}`
@@ -179,7 +182,10 @@ export default function Dashboard() {
     localStorage.setItem('db_period', periodName)
   }, [day, start, periodName])
 
-  const periods = SCHEDULES[day][start]
+  const periods = SCHEDULES[day][start].filter(p => {
+    const num = p.name.match(/\d+/)?.[0] ?? ''
+    return firebaseRoster[`${day}_${num}`]?.name?.trim()
+  })
   const period = periods.find(p => p.name === periodName) ?? periods[0]
 
   // Get student list from Firebase roster — fall back to schedules.ts only if Firebase

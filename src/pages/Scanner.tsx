@@ -81,7 +81,11 @@ export default function Scanner() {
 
   const { isIPadLandscape, isLargerThanIPad } = useWindowSize()
   const { roster } = useRoster()
-  const periods = SCHEDULES[day][start]
+  const allPeriods = SCHEDULES[day][start]
+  const periods = allPeriods.filter(p => {
+    const num = p.name.match(/\d+/)?.[0] ?? ''
+    return roster[`${day}_${num}`]?.name?.trim()
+  })
   const period: Period | null = periods.find(p => p.name === periodName) ?? periods[0] ?? null
 
   // Get student list from Firebase roster — fall back to schedules.ts only if Firebase
@@ -484,7 +488,11 @@ export default function Scanner() {
 
             <div style={{ fontSize: 11, fontWeight: 700, color: C.slate, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>Period</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 24 }}>
-              {SCHEDULES[pickDay][pickStart].map(p => {
+              {SCHEDULES[pickDay][pickStart].filter(p => {
+                const num = p.name.match(/\d+/)?.[0] ?? ''
+                const rKey = `${pickDay}_${num}`
+                return roster[rKey]?.name?.trim()
+              }).map(p => {
                 const pNum = p.name.match(/\d+/)?.[0] ?? ''
                 const pDay = pickDay === 'red' ? 'Red' : 'Black'
                 const periodLabel = `${pDay} ${pNum}`

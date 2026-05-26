@@ -86,7 +86,10 @@ export default function Analytics() {
 
   // Build period options from Firebase roster + schedules
   const periodOptions = useMemo(() => {
-    const periods = SCHEDULES[schedDay].regular
+    const periods = SCHEDULES[schedDay].regular.filter(p => {
+      const num = p.name.match(/\d+/)?.[0] ?? ''
+      return roster[`${schedDay}_${num}`]?.name?.trim()
+    })
     return periods.map(p => {
       const num = p.name.match(/\d+/)?.[0] ?? '1'
       const key = `${schedDay}_${num}`
