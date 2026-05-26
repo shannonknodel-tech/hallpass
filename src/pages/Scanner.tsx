@@ -289,10 +289,10 @@ export default function Scanner() {
           {period ? (
             <>
               <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: '2.15rem', color: C.ink, margin: 0, lineHeight: 1.1 }}>
-                {rosterEntry?.name || period.name.replace(/^[^-]+-/, '')}
+                {rosterEntry?.name || 'Unnamed Class'}
               </h1>
               <span style={{ fontSize: 17, fontWeight: 600, color: C.muted, lineHeight: 1.3 }}>
-                {period.name.replace(/-.*$/, '')} &nbsp;·&nbsp; {fmt12(period.startTime)} – {fmt12(period.endTime)}
+                {period.name.replace(/([A-Za-z]+)(\d+)/, '$1 $2')} &nbsp;·&nbsp; {fmt12(period.startTime)} – {fmt12(period.endTime)}
               </span>
             </>
           ) : (

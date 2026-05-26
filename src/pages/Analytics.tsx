@@ -90,7 +90,7 @@ export default function Analytics() {
     return periods.map(p => {
       const num = p.name.match(/\d+/)?.[0] ?? '1'
       const key = `${schedDay}_${num}`
-      const className = roster[key]?.name || p.name.replace(/^[^-]+-/, '')
+      const className = roster[key]?.name || p.name.replace(/([A-Za-z]+)(\d+)/, '$1 $2')
       const dayLabel = schedDay === 'red' ? 'Red' : 'Black'
       return { key, label: className, sub: `${dayLabel} ${num}`, periodName: p.name }
     })

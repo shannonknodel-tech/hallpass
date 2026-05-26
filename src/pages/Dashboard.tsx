@@ -329,7 +329,7 @@ export default function Dashboard() {
             {period ? (
               <>
                 <span style={{ fontSize: 15, fontWeight: 700, color: C.ink, lineHeight: 1.3 }}>
-                  {rosterPeriod?.name || period.name.replace(/^[^-]+-/, '')}
+                  {rosterPeriod?.name || 'Unnamed Class'}
                 </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                   <span style={{ width: 6, height: 6, borderRadius: '50%', background: isPeriodActive ? C.green : C.muted, display: 'inline-block', flexShrink: 0 }} />
