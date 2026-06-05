@@ -66,6 +66,12 @@ export default function Scanner() {
     const saved = localStorage.getItem('hp_maxOut')
     return saved ? parseInt(saved) : 5
   })
+  const [maxTripMinutes, setMaxTripMinutes] = useState<number>(() => {
+    const saved = localStorage.getItem('hp_maxTripMinutes')
+    return saved ? parseInt(saved) : 40
+  })
+  const [pickMaxTripMinutes, setPickMaxTripMinutes] = useState<number>(() =>
+    parseInt(localStorage.getItem('hp_maxTripMinutes') ?? '40'))
   const [outSet, setOutSet] = useState<Set<string>>(new Set())
   const [outTimes, setOutTimes] = useState<Record<string, number>>({})
   const [tick, setTick] = useState(0)
@@ -119,49 +125,74 @@ export default function Scanner() {
   dayRef.current = day
   startRef.current = start
 
+  // Store latest snapshot data in a ref so the tick-based checker can use it
+  const latestSnapRef = useRef<Record<string, {
+    status: string; name: string; period: string; schedule: string;
+    outTimestamp: number|null; timestamp: number
+  }>>({})
+  const maxTripMinutesRef = useRef(maxTripMinutes)
+  maxTripMinutesRef.current = maxTripMinutes
+
+  const runResetCheck = async () => {
+    const p = periodRef.current
+    const d = dayRef.current
+    const s = startRef.current
+    if (!p) return
+
+    const sched = scheduleStr(d, s)
+    const all = latestSnapRef.current
+
+    const now = new Date()
+    const t = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0')
+    const periodOver = t >= p.endTime
+    const nowMs = Date.now()
+    const resetTime = nowMs
+    const today = todayStr()
+    const maxTripMs = maxTripMinutesRef.current * 60 * 1000
+
+    const newOut = new Set<string>()
+    const newTimes: Record<string, number> = {}
+
+    for (const [key, student] of Object.entries(all)) {
+      if (student.period !== p.name || student.schedule !== sched) continue
+      if (student.status === 'out') {
+        const outStart = student.outTimestamp ?? student.timestamp
+        const tripMs = nowMs - outStart
+        const exceededMaxTrip = tripMs >= maxTripMs
+        if (periodOver || exceededMaxTrip) {
+          await writeAutoReset({ name: student.name, period: student.period, schedule: student.schedule, studentKey: key, outStart, resetTime, date: today })
+        } else {
+          newOut.add(student.name)
+          newTimes[student.name] = outStart
+        }
+      }
+    }
+
+    setOutSet(newOut)
+    setOutTimes(newTimes)
+  }
+
+  const runResetCheckRef = useRef(runResetCheck)
+  runResetCheckRef.current = runResetCheck
+
   useEffect(() => {
     const studentsRef = ref(db, 'students')
 
-    const handleSnapshot = async (snap: import('firebase/database').DataSnapshot) => {
-      const p = periodRef.current
-      const d = dayRef.current
-      const s = startRef.current
-      if (!p) return
-
-      const sched = scheduleStr(d, s)
-      const all = (snap.val() ?? {}) as Record<string, {
-        status: string; name: string; period: string; schedule: string;
-        outTimestamp: number|null; timestamp: number
-      }>
-
-      const now = new Date()
-      const t = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0')
-      const periodOver = t >= p.endTime
-      const resetTime = Date.now()
-      const today = todayStr()
-
-      const newOut = new Set<string>()
-      const newTimes: Record<string, number> = {}
-
-      for (const [key, student] of Object.entries(all)) {
-        if (student.period !== p.name || student.schedule !== sched) continue
-        if (student.status === 'out') {
-          if (periodOver) {
-            await writeAutoReset({ name: student.name, period: student.period, schedule: student.schedule, studentKey: key, outStart: student.outTimestamp ?? student.timestamp, resetTime, date: today })
-          } else {
-            newOut.add(student.name)
-            newTimes[student.name] = student.outTimestamp ?? student.timestamp
-          }
-        }
-      }
-
-      setOutSet(newOut)
-      setOutTimes(newTimes)
+    const handleSnapshot = (snap: import('firebase/database').DataSnapshot) => {
+      latestSnapRef.current = (snap.val() ?? {}) as typeof latestSnapRef.current
+      runResetCheckRef.current()
     }
 
     onValue(studentsRef, handleSnapshot)
     return () => off(studentsRef, 'value', handleSnapshot)
-  }, [])  // Empty deps — subscribes once, reads from refs
+  }, [])  // Subscribe once — snapshot data stored in ref
+
+  // Also run reset check every second so period-end and max-trip resets fire
+  // even when no Firebase data changes happen at that exact moment
+  useEffect(() => {
+    if (Object.keys(latestSnapRef.current).length === 0) return
+    runResetCheckRef.current()
+  }, [tick])
 
   const applySchedule = (d: ScheduleDay, s: StartType) => {
     setDay(d); setStart(s)
@@ -317,7 +348,7 @@ export default function Scanner() {
 
         {/* Right: settings only — counter is hidden below grid */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={() => { setPickDay(day); setPickStart(start); setPickPeriod(periodName || SCHEDULES[day][start][0]?.name || ''); setPickMaxOut(maxOut); setScreen('settings') }}
+          <button onClick={() => { setPickDay(day); setPickStart(start); setPickPeriod(periodName || SCHEDULES[day][start][0]?.name || ''); setPickMaxOut(maxOut); setPickMaxTripMinutes(maxTripMinutes); setScreen('settings') }}
             style={{ background: C.cloud, border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 12px', fontSize: 16, color: C.slate, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
             Schedule
@@ -544,6 +575,30 @@ export default function Scanner() {
                 style={{ width: '100%', marginTop: 10, padding: '9px 0', borderRadius: 8, border: 'none', background: pickMaxOut !== maxOut ? '#667eea' : C.cloud, color: pickMaxOut !== maxOut ? '#fff' : C.muted, fontSize: 14, fontWeight: 600, cursor: pickMaxOut !== maxOut ? 'pointer' : 'default' }}>
                 {pickMaxOut === maxOut ? 'No change' : 'Apply change (PIN required)'}
               </button>
+
+              <div style={{ marginTop: 20 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 4 }}>Max Trip Duration</div>
+                <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>Students out longer than this are auto-reset</div>
+                <select
+                  value={pickMaxTripMinutes}
+                  onChange={e => setPickMaxTripMinutes(parseInt(e.target.value))}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 15, color: C.ink, fontFamily: 'inherit', background: C.white, cursor: 'pointer', appearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
+                >
+                  {[10, 15, 20, 25, 30, 35, 40, 45, 60].map(n => (
+                    <option key={n} value={n}>{n} minutes</option>
+                  ))}
+                </select>
+                <button onClick={() => {
+                  if (pickMaxTripMinutes !== maxTripMinutes) {
+                    setMaxTripMinutes(pickMaxTripMinutes)
+                    localStorage.setItem('hp_maxTripMinutes', String(pickMaxTripMinutes))
+                    setScreen('main')
+                  }
+                }} disabled={pickMaxTripMinutes === maxTripMinutes}
+                  style={{ width: '100%', marginTop: 10, padding: '9px 0', borderRadius: 8, border: 'none', background: pickMaxTripMinutes !== maxTripMinutes ? '#667eea' : C.cloud, color: pickMaxTripMinutes !== maxTripMinutes ? '#fff' : C.muted, fontSize: 14, fontWeight: 600, cursor: pickMaxTripMinutes !== maxTripMinutes ? 'pointer' : 'default' }}>
+                  {pickMaxTripMinutes === maxTripMinutes ? 'No change' : 'Apply'}
+                </button>
+              </div>
             </div>
           </div>
         </Overlay>
